@@ -3,3 +3,6 @@ __pycache__/
 *.db
 uploads/
 sample_gpx/
+.terraform/
+*.tfstate
+*.tfstate.backup
