@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.db
+.git/
+sample_gpx/
+uploads/
