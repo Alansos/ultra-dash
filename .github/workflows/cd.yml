@@ -19,4 +19,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/Alansos/ultra-dash:latest
+          tags: ghcr.io/alansos/ultra-dash:latest
