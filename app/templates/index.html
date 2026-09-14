@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ultra Dash</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { background:#141414; color:#e8e8e8; font-family:system-ui,sans-serif; max-width:960px; margin:2rem auto; padding:0 1rem; }
+  .card { background:#1f1f1f; border-radius:10px; padding:1.25rem; margin-bottom:1.25rem; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { padding:.5rem .25rem; text-align:left; border-bottom:1px solid #333; }
+  .flag { color:#ff8787; } .good { color:#69db7c; } .muted { color:#999; }
+  button { background:#4dabf7; border:none; padding:.5rem 1rem; border-radius:6px; cursor:pointer; font-size:1rem; color:#111; }
+</style>
+</head>
+<body>
+<h1>🏃 Ultra Dash</h1>
+<p class="muted">Training-load analytics for ultrarunners.</p>
+
+<div class="card">
+  <h2>Upload a run</h2>
+  <form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".gpx" required>
+    <button type="submit">Upload</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Weekly volume</h2>
+  <canvas id="weeklyChart"></canvas>
+</div>
+
+<div class="card">
+  <h2>7-day rolling km</h2>
+  <canvas id="rollingChart"></canvas>
+</div>
+
+<div class="card">
+  <h2>Flags</h2>
+  {% if spikes %}
+    {% for s in spikes %}<p class="flag">⚠️ {{ s.week }}: +{{ s.jump_pct }}% jump ({{ s.prev_km }} → {{ s.km }} km)</p>{% endfor %}
+  {% else %}<p class="good">✓ No workload spikes detected.</p>{% endif %}
+  {% if back_to_backs %}
+    {% for b in back_to_backs %}<p class="good">🔥 Back-to-back: {{ b.day1 }} ({{ b.day1_km }} km) + {{ b.day2 }} ({{ b.day2_km }} km)</p>{% endfor %}
+  {% else %}<p class="muted">No back-to-backs detected yet.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent activities</h2>
+  <table>
+    <tr><th>Date</th><th>Distance</th><th>Time</th><th>Elev gain</th></tr>
+    {% for a in activities %}
+    <tr><td>{{ a.start_time[:10] }}</td><td>{{ a.distance_km }} km</td><td>{{ (a.duration_s/3600)|round(1) }} h</td><td>{{ a.elev_gain_m }} m</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<script>
+const weekly = {{ weekly | tojson }};
+const rolling = {{ rolling | tojson }};
+
+new Chart(document.getElementById('weeklyChart'), {
+  type: 'bar',
+  data: { labels: weekly.map(w => w.week),
+    datasets: [{ data: weekly.map(w => w.km), backgroundColor: '#4dabf7' }] },
+  options: { plugins: { legend: { display: false } },
+    scales: { x: { ticks: { color: '#999' } }, y: { ticks: { color: '#999' } } } }
+});
+
+new Chart(document.getElementById('rollingChart'), {
+  type: 'line',
+  data: { labels: rolling.map(r => r.date),
+    datasets: [{ data: rolling.map(r => r.km_7day), borderColor: '#69db7c', tension: 0.2 }] },
+  options: { plugins: { legend: { display: false } },
+    scales: { x: { ticks: { color: '#999', maxTicksLimit: 8 } }, y: { ticks: { color: '#999' } } } }
+});
+</script>
+</body>
+</html>
