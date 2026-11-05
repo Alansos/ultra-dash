@@ -16,6 +16,7 @@
 <body>
 <h1>🏃 Ultra Dash</h1>
 <p class="muted">Training-load analytics for ultrarunners.</p>
+{% if user %}<p class="muted">Logged in as {{ user.email }} · <a href="/logout" style="color:#4dabf7;">Log out</a></p>{% endif %}
 
 <div class="card">
   <h2>Upload a run</h2>
