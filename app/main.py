@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import create_user, get_user_by_email, get_user_by_id, verify_password, set_race_date
 from app.db import init_db, insert_activity, get_all_activities, get_activities_for_user 
-from app.metrics import weekly_load, rolling_7day, detect_spikes, detect_back_to_backs, taper_guidance
+from app.metrics import weekly_load, rolling_7day, detect_spikes, detect_back_to_backs, taper_guidance, overtraining_alerts
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
@@ -51,6 +51,7 @@ def dashboard(request: Request):
     "activities": acts[-10:][::-1],
     "race_date": race_date,
     "guidance": guidance,
+    "alerts": overtraining_alerts(acts),
 })
 
 @app.post("/race-date")

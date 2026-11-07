@@ -9,7 +9,7 @@
   .card { background:#1f1f1f; border-radius:10px; padding:1.25rem; margin-bottom:1.25rem; }
   table { width:100%; border-collapse:collapse; }
   th,td { padding:.5rem .25rem; text-align:left; border-bottom:1px solid #333; }
-  .flag { color:#ff8787; } .good { color:#69db7c; } .muted { color:#999; }
+  .flag { color:#ff8787; } .good { color:#69db7c; } .muted { color:#999; } .warn { color:#ffd43b; }
   button { background:#4dabf7; border:none; padding:.5rem 1rem; border-radius:6px; cursor:pointer; font-size:1rem; color:#111; }
 </style>
 </head>
@@ -44,6 +44,12 @@
   {% endif %}
 </div>
 
+<div class="card">
+  <h2>Overtraining alerts</h2>
+  {% if alerts %}
+    {% for a in alerts %}<p class="{{ 'flag' if a.severity == 'high' else 'warn' }}">⚠️ {{ a.message }}</p>{% endfor %}
+  {% else %}<p class="good">✓ Workload looks steady — no alerts.</p>{% endif %}
+</div>
 
 <div class="card">
   <h2>Weekly volume</h2>

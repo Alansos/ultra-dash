@@ -1,6 +1,6 @@
 from datetime import date 
 
-from app.metrics import detect_back_to_backs, detect_spikes, taper_guidance, taper_score, weekly_load
+from app.metrics import acute_chronic_ratio, detect_back_to_backs, detect_spikes, overtraining_alerts, taper_guidance, taper_score, weekly_load
 
 
 def test_weekly_load_groups_by_week():
@@ -103,3 +103,43 @@ def test_guidance_no_base_data():
     result = taper_guidance(acts, "2026-07-01", today=date(2026, 6, 19))
     assert result["status"] == "nodata"
     assert result["drop_pct"] is None
+
+def test_acwr_high_alert():
+    # "Today" 2026-07-01. Four Thursdays, one per week: 50, 50, 50, 100 km.
+    # Acute (Jun 25-Jul 1): 100. Chronic (28 days / 4): 62.5. ACWR = 1.6.
+    acts = [_run("2026-06-04", 50.0), _run("2026-06-11", 50.0),
+            _run("2026-06-18", 50.0), _run("2026-06-25", 100.0)]
+    assert acute_chronic_ratio(acts, today=date(2026, 7, 1)) == 1.6
+    alerts = overtraining_alerts(acts, today=date(2026, 7, 1))
+    assert any(a["type"] == "acwr" and a["severity"] == "high" for a in alerts)
+
+
+def test_acwr_medium_alert():
+    # Same shape, last week 85 km: acute 85, chronic 58.75, ACWR = 1.45.
+    acts = [_run("2026-06-04", 50.0), _run("2026-06-11", 50.0),
+            _run("2026-06-18", 50.0), _run("2026-06-25", 85.0)]
+    assert acute_chronic_ratio(acts, today=date(2026, 7, 1)) == 1.45
+    alerts = overtraining_alerts(acts, today=date(2026, 7, 1))
+    assert any(a["type"] == "acwr" and a["severity"] == "medium" for a in alerts)
+
+
+def test_spike_alert_without_acwr():
+    # Jump in week 2 (50 -> 80 km), then even weeks after: ACWR stays ~0.87.
+    acts = [_run("2026-06-04", 50.0), _run("2026-06-11", 80.0),
+            _run("2026-06-18", 50.0), _run("2026-06-25", 50.0)]
+    alerts = overtraining_alerts(acts, today=date(2026, 7, 1))
+    assert len(alerts) == 1
+    assert alerts[0]["type"] == "spike"
+    assert alerts[0]["severity"] == "high"
+
+
+def test_no_alerts_on_steady_load():
+    acts = [_run("2026-06-04", 50.0), _run("2026-06-11", 50.0),
+            _run("2026-06-18", 50.0), _run("2026-06-25", 50.0)]
+    assert acute_chronic_ratio(acts, today=date(2026, 7, 1)) == 1.0
+    assert overtraining_alerts(acts, today=date(2026, 7, 1)) == []
+
+
+def test_no_alerts_without_data():
+    assert acute_chronic_ratio([], today=date(2026, 7, 1)) is None
+    assert overtraining_alerts([], today=date(2026, 7, 1)) == []

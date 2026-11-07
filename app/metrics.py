@@ -161,3 +161,45 @@ def taper_guidance(activities, race_date, today=None):
     return {"status": "cut_too_much", "days_to_race": days_to_race,
             "drop_pct": drop_pct, "base_km": round(base_km, 1), "taper_km": round(taper_km, 1),
             "message": prefix + f"Volume is {drop_pct}% below your build block — past the usual 40–60% taper range. Keep a few short, sharp runs in."}
+
+def acute_chronic_ratio(activities, today=None):
+    """Acute:chronic workload ratio (ACWR): last 7 days vs the 4-week average.
+
+    The standard overtraining gauge. Around 1.0 is steady, 1.3-1.5 is
+    climbing fast, above 1.5 is the danger zone. Returns None when there
+    is no training in the last 4 weeks to compare against.
+    """
+    if today is None:
+        today = date.today()
+
+    def km_between(start, end):
+        total = 0.0
+        for a in activities:
+            day = datetime.fromisoformat(a["start_time"]).date()
+            if start <= day < end:
+                total += a["distance_km"]
+        return total
+
+    acute_km = km_between(today - timedelta(days=6), today + timedelta(days=1))
+    chronic_km = km_between(today - timedelta(days=27), today + timedelta(days=1)) / 4
+    if chronic_km == 0:
+        return None
+    return round(acute_km / chronic_km, 2)
+
+
+def overtraining_alerts(activities, today=None):
+    """Alerts when the load looks risky: ACWR danger zone + weekly spikes."""
+    alerts = []
+    acwr = acute_chronic_ratio(activities, today)
+    if acwr is not None:
+        if acwr > 1.5:
+            alerts.append({"type": "acwr", "severity": "high",
+                "message": f"Workload spiked — the last 7 days are {acwr}x your 4-week average. Back off before it becomes an injury."})
+        elif acwr >= 1.3:
+            alerts.append({"type": "acwr", "severity": "medium",
+                "message": f"Workload is climbing fast — the last 7 days are {acwr}x your 4-week average."})
+    for s in detect_spikes(weekly_load(activities)):
+        severity = "high" if s["jump_pct"] > 50 else "medium"
+        alerts.append({"type": "spike", "severity": severity,
+            "message": f"{s['week']}: +{s['jump_pct']}% jump ({s['prev_km']} -> {s['km']} km) in one week."})
+    return alerts
