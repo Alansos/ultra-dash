@@ -8,9 +8,9 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.auth import create_user, get_user_by_email, get_user_by_id, verify_password
+from app.auth import create_user, get_user_by_email, get_user_by_id, verify_password, set_race_date
 from app.db import init_db, insert_activity, get_all_activities, get_activities_for_user 
-from app.metrics import weekly_load, rolling_7day, detect_spikes, detect_back_to_backs
+from app.metrics import weekly_load, rolling_7day, detect_spikes, detect_back_to_backs, taper_guidance
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
@@ -39,6 +39,9 @@ def dashboard(request: Request):
         return RedirectResponse("/login", status_code=303)
     acts = get_activities_for_user(user["id"])
     weekly = weekly_load(acts)
+    race_date = user.get("race_date")
+    guidance = taper_guidance(acts, race_date) if race_date else None
+
     return templates.TemplateResponse(request, "index.html", {
     "user": user,
     "weekly": weekly,
@@ -46,8 +49,20 @@ def dashboard(request: Request):
     "spikes": detect_spikes(weekly),
     "back_to_backs": detect_back_to_backs(acts),
     "activities": acts[-10:][::-1],
+    "race_date": race_date,
+    "guidance": guidance,
 })
 
+@app.post("/race-date")
+def save_race_date(request: Request, race_date: str = Form("")):
+    user = current_user(request)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    try:
+        set_race_date(user["id"], race_date)
+    except ValueError:
+        pass  # bad date from the form; leave the saved date unchanged
+    return RedirectResponse("/", status_code=303)
 
 
 
@@ -80,6 +95,9 @@ def api_weekly(request: Request):
         return RedirectResponse("/login", status_code=303)
     acts = get_activities_for_user(user["id"])
     weekly = weekly_load(acts)
+    race_date = user.get("race_date")
+    guidance = taper_guidance(acts, race_date) if race_date else None
+
     return {
         "weekly": weekly,
         "spikes": detect_spikes(weekly),

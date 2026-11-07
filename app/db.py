@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
+  race_date TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -38,6 +39,16 @@ def init_db():
     conn.commit()
     conn.close()
     _migrate_activities_user_id()
+    _migrate_users_race_date()
+
+def _migrate_users_race_date():
+    """Add the race_date column to a pre-existing users table."""
+    conn = get_connection()
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "race_date" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN race_date TEXT")
+        conn.commit()
+    conn.close()
 
 def _migrate_activities_user_id():
     """Add the user_id column to a pre-existing activities table."""

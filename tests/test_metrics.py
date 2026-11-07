@@ -1,4 +1,6 @@
-from app.metrics import detect_back_to_backs, detect_spikes, taper_score, weekly_load
+from datetime import date 
+
+from app.metrics import detect_back_to_backs, detect_spikes, taper_guidance, taper_score, weekly_load
 
 
 def test_weekly_load_groups_by_week():
@@ -53,3 +55,51 @@ def test_taper_drop():
     assert result["base_km"] == 300.0
     assert result["taper_km"] == 180.0
     assert result["drop_pct"] == 40.0
+def _run(day, km):
+    return {"start_time": f"{day}T08:00:00+00:00", "distance_km": km,
+            "duration_s": 3600, "elev_gain_m": 0}
+
+
+def test_guidance_build_phase():
+    # Race 2026-07-01, "today" 2026-05-20: 42 days out, too early to taper.
+    result = taper_guidance([], "2026-07-01", today=date(2026, 5, 20))
+    assert result["status"] == "build"
+    assert result["days_to_race"] == 42
+
+
+def test_guidance_race_done():
+    result = taper_guidance([], "2026-07-01", today=date(2026, 7, 2))
+    assert result["status"] == "done"
+    assert result["days_to_race"] == -1
+
+
+def test_guidance_on_track():
+    # Race 2026-07-01, "today" 2026-06-19: 12 days out, 10 taper days elapsed.
+    # Base first 10 days: 100 km. Taper first 10 days: 50 km -> 50% drop.
+    acts = [_run("2026-05-20", 100.0), _run("2026-06-10", 50.0)]
+    result = taper_guidance(acts, "2026-07-01", today=date(2026, 6, 19))
+    assert result["status"] == "on_track"
+    assert result["drop_pct"] == 50.0
+    assert result["days_to_race"] == 12
+
+
+def test_guidance_cut_more():
+    acts = [_run("2026-05-20", 100.0), _run("2026-06-10", 80.0)]
+    result = taper_guidance(acts, "2026-07-01", today=date(2026, 6, 19))
+    assert result["status"] == "cut_more"
+    assert result["drop_pct"] == 20.0
+
+
+def test_guidance_above_build_block():
+    acts = [_run("2026-05-20", 100.0), _run("2026-06-10", 120.0)]
+    result = taper_guidance(acts, "2026-07-01", today=date(2026, 6, 19))
+    assert result["status"] == "cut_more"
+    assert result["drop_pct"] == -20.0
+    assert "ABOVE" in result["message"]
+
+
+def test_guidance_no_base_data():
+    acts = [_run("2026-06-10", 50.0)]
+    result = taper_guidance(acts, "2026-07-01", today=date(2026, 6, 19))
+    assert result["status"] == "nodata"
+    assert result["drop_pct"] is None

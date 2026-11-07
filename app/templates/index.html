@@ -25,6 +25,25 @@
     <button type="submit">Upload</button>
   </form>
 </div>
+<div class="card">
+  <h2>Taper guidance</h2>
+  <form action="/race-date" method="post">
+    <label for="race_date">Next race date</label>
+    <input type="date" id="race_date" name="race_date" value="{{ race_date or '' }}" required>
+    <button type="submit">Save</button>
+  </form>
+  {% if guidance %}
+    <p class="{{ 'good' if guidance.status == 'on_track' else 'flag' if guidance.status in ['cut_more', 'cut_too_much'] else 'muted' }}">{{ guidance.message }}</p>
+    {% if guidance.drop_pct is not none %}
+    <p class="muted">Build block: {{ guidance.base_km }} km · Taper so far: {{ guidance.taper_km }} km · Drop: {{ guidance.drop_pct }}%</p>
+    {% endif %}
+  {% elif race_date %}
+    <p class="muted">No taper guidance yet.</p>
+  {% else %}
+    <p class="muted">Set your next race date to see taper guidance.</p>
+  {% endif %}
+</div>
+
 
 <div class="card">
   <h2>Weekly volume</h2>

@@ -2,7 +2,7 @@
 No database, no web code here — that keeps every function trivially testable."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 
 def weekly_load(activities):
@@ -100,3 +100,64 @@ def taper_score(activities, race_date):
         "taper_km": round(taper_km, 1),
         "drop_pct": round(drop_pct, 1),
     }
+def taper_guidance(activities, race_date, today=None):
+    """Plain-English taper guidance for the dashboard.
+
+    A normal taper lands 40-60% below the build block over the 3 weeks
+    before race day. Because the race is usually still ahead, this only
+    counts the taper days that have actually happened so far, and compares
+    them against the same number of days in the 3 weeks before that.
+    """
+    race_day = datetime.fromisoformat(race_date).date()
+    if today is None:
+        today = date.today()
+    days_to_race = (race_day - today).days
+
+    if days_to_race < 0:
+        return {"status": "done", "days_to_race": days_to_race,
+                "drop_pct": None, "base_km": 0.0, "taper_km": 0.0,
+                "message": "Race day has passed — set your next race date."}
+
+    if days_to_race > 21:
+        weeks = days_to_race // 7
+        return {"status": "build", "days_to_race": days_to_race,
+                "drop_pct": None, "base_km": 0.0, "taper_km": 0.0,
+                "message": f"{weeks} weeks until race day — too early to taper, keep building."}
+
+    taper_start = race_day - timedelta(weeks=3)
+    base_start = race_day - timedelta(weeks=6)
+    elapsed = min((today - taper_start).days + 1, 21)
+
+    def km_between(start, end):
+        total = 0.0
+        for a in activities:
+            day = datetime.fromisoformat(a["start_time"]).date()
+            if start <= day < end:
+                total += a["distance_km"]
+        return total
+
+    taper_km = km_between(taper_start, today + timedelta(days=1))
+    base_km = km_between(base_start, base_start + timedelta(days=elapsed))
+
+    if base_km == 0:
+        return {"status": "nodata", "days_to_race": days_to_race,
+                "drop_pct": None, "base_km": 0.0, "taper_km": round(taper_km, 1),
+                "message": "No training logged in your build block — upload runs to see taper guidance."}
+
+    drop_pct = round((base_km - taper_km) / base_km * 100, 1)
+    prefix = f"{days_to_race} days to race day. "
+    if drop_pct < 0:
+        return {"status": "cut_more", "days_to_race": days_to_race,
+                "drop_pct": drop_pct, "base_km": round(base_km, 1), "taper_km": round(taper_km, 1),
+                "message": prefix + f"Volume is {abs(drop_pct)}% ABOVE your build block — time to ease off."}
+    if drop_pct < 40:
+        return {"status": "cut_more", "days_to_race": days_to_race,
+                "drop_pct": drop_pct, "base_km": round(base_km, 1), "taper_km": round(taper_km, 1),
+                "message": prefix + f"Volume is only {drop_pct}% below your build block — ease off more this week."}
+    if drop_pct <= 60:
+        return {"status": "on_track", "days_to_race": days_to_race,
+                "drop_pct": drop_pct, "base_km": round(base_km, 1), "taper_km": round(taper_km, 1),
+                "message": prefix + f"On track — volume is {drop_pct}% below your build block."}
+    return {"status": "cut_too_much", "days_to_race": days_to_race,
+            "drop_pct": drop_pct, "base_km": round(base_km, 1), "taper_km": round(taper_km, 1),
+            "message": prefix + f"Volume is {drop_pct}% below your build block — past the usual 40–60% taper range. Keep a few short, sharp runs in."}
