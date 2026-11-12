@@ -45,6 +45,24 @@
 </div>
 
 <div class="card">
+  <h2>Share my profile</h2>
+  {% if share_url %}
+    <p class="muted">Anyone with this link can see your training — read-only, your email stays hidden.</p>
+    <input type="text" value="{{ share_url }}" readonly id="shareLink" style="width:100%; background:#141414; color:#e8e8e8; border:1px solid #333; border-radius:6px; padding:.5rem;">
+    <p><button type="button" onclick="navigator.clipboard.writeText(document.getElementById('shareLink').value)">Copy link</button></p>
+    <form action="/share/disable" method="post">
+      <button type="submit">Turn off sharing</button>
+    </form>
+  {% else %}
+    <p class="muted">Share a read-only link to your training. Your email stays hidden, and you can turn it off anytime.</p>
+    <form action="/share/enable" method="post">
+      <button type="submit">Enable sharing</button>
+    </form>
+  {% endif %}
+</div>
+
+
+<div class="card">
   <h2>Overtraining alerts</h2>
   {% if alerts %}
     {% for a in alerts %}<p class="{{ 'flag' if a.severity == 'high' else 'warn' }}">⚠️ {{ a.message }}</p>{% endfor %}

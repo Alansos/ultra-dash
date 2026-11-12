@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   race_date TEXT,
+  share_token TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,6 +41,7 @@ def init_db():
     conn.close()
     _migrate_activities_user_id()
     _migrate_users_race_date()
+    _migrate_users_share_token()
 
 def _migrate_users_race_date():
     """Add the race_date column to a pre-existing users table."""
@@ -56,6 +58,16 @@ def _migrate_activities_user_id():
     cols = [r[1] for r in conn.execute("PRAGMA table_info(activities)").fetchall()]
     if "user_id" not in cols:
         conn.execute("ALTER TABLE activities ADD COLUMN user_id INTEGER")
+        conn.commit()
+    conn.close()
+
+
+def _migrate_users_share_token():
+    """Add the share_token column to a pre-existing users table."""
+    conn = get_connection()
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "share_token" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN share_token TEXT")
         conn.commit()
     conn.close()
 

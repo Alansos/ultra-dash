@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ultra Dash — Shared training profile</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { background:#141414; color:#e8e8e8; font-family:system-ui,sans-serif; max-width:960px; margin:2rem auto; padding:0 1rem; }
+  .card { background:#1f1f1f; border-radius:10px; padding:1.25rem; margin-bottom:1.25rem; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { padding:.5rem .25rem; text-align:left; border-bottom:1px solid #333; }
+  .flag { color:#ff8787; } .good { color:#69db7c; } .muted { color:#999; } .warn { color:#ffd43b; }
+</style>
+</head>
+<body>
+<h1>🏃 Ultra Dash</h1>
+<p class="muted">Shared training profile — read-only.</p>
+
+<div class="card">
+  <h2>Taper guidance</h2>
+  {% if guidance %}
+    <p class="{{ 'good' if guidance.status == 'on_track' else 'flag' if guidance.status in ['cut_more', 'cut_too_much'] else 'muted' }}">{{ guidance.message }}</p>
+    {% if guidance.drop_pct is not none %}
+    <p class="muted">Build block: {{ guidance.base_km }} km · Taper so far: {{ guidance.taper_km }} km · Drop: {{ guidance.drop_pct }}%</p>
+    {% endif %}
+  {% elif race_date %}
+    <p class="muted">No taper guidance yet.</p>
+  {% else %}
+    <p class="muted">No race date set.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Overtraining alerts</h2>
+  {% if alerts %}
+    {% for a in alerts %}<p class="{{ 'flag' if a.severity == 'high' else 'warn' }}">⚠️ {{ a.message }}</p>{% endfor %}
+  {% else %}<p class="good">✓ Workload looks steady — no alerts.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Weekly volume</h2>
+  <canvas id="weeklyChart"></canvas>
+</div>
+
+<div class="card">
+  <h2>7-day rolling km</h2>
+  <canvas id="rollingChart"></canvas>
+</div>
+
+<div class="card">
+  <h2>Flags</h2>
+  {% if spikes %}
+    {% for s in spikes %}<p class="flag">⚠️ {{ s.week }}: +{{ s.jump_pct }}% jump ({{ s.prev_km }} → {{ s.km }} km)</p>{% endfor %}
+  {% else %}<p class="good">✓ No workload spikes detected.</p>{% endif %}
+  {% if back_to_backs %}
+    {% for b in back_to_backs %}<p class="good">🔥 Back-to-back: {{ b.day1 }} ({{ b.day1_km }} km) + {{ b.day2 }} ({{ b.day2_km }} km)</p>{% endfor %}
+  {% else %}<p class="muted">No back-to-backs detected yet.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent activities</h2>
+  <table>
+    <tr><th>Date</th><th>Distance</th><th>Time</th><th>Elev gain</th></tr>
+    {% for a in activities %}
+    <tr><td>{{ a.start_time[:10] }}</td><td>{{ a.distance_km }} km</td><td>{{ (a.duration_s/3600)|round(1) }} h</td><td>{{ a.elev_gain_m }} m</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<script>
+const weekly = {{ weekly | tojson }};
+const rolling = {{ rolling | tojson }};
+
+new Chart(document.getElementById('weeklyChart'), {
+  type: 'bar',
+  data: { labels: weekly.map(w => w.week),
+    datasets: [{ data: weekly.map(w => w.km), backgroundColor: '#4dabf7' }] },
+  options: { plugins: { legend: { display: false } },
+    scales: { x: { ticks: { color: '#999' } }, y: { ticks: { color: '#999' } } } }
+});
+
+new Chart(document.getElementById('rollingChart'), {
+  type: 'line',
+  data: { labels: rolling.map(r => r.date),
+    datasets: [{ data: rolling.map(r => r.km_7day), borderColor: '#69db7c', tension: 0.2 }] },
+  options: { plugins: { legend: { display: false } },
+    scales: { x: { ticks: { color: '#999', maxTicksLimit: 8 } }, y: { ticks: { color: '#999' } } } }
+});
+</script>
+</body>
+</html>

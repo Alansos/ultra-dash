@@ -48,7 +48,7 @@ def create_user(email: str, password: str, race_date: str = None):
         conn.close()
         return None
     row = conn.execute(
-        "SELECT id, email, race_date, created_at FROM users WHERE id = ?", (user_id,)
+       "SELECT id, email, race_date, share_token, created_at FROM users WHERE id = ?", (user_id,)
     ).fetchone()
     conn.close()
     return dict(row)
@@ -62,14 +62,61 @@ def get_user_by_email(email: str):
     ).fetchone()
     conn.close()
     return dict(row) if row else None
+
 def get_user_by_id(user_id: int):
-    """Return the user (id, email, race_date, created_at) or None."""
+    """Return the user (id, email, race_date, share_token, created_at) or None."""
     conn = get_connection()
     row = conn.execute(
-        "SELECT id, email, race_date, created_at FROM users WHERE id = ?", (user_id,)
+       "SELECT id, email, race_date, share_token, created_at FROM users WHERE id = ?", (user_id,)
+
     ).fetchone()
     conn.close()
     return dict(row) if row else None
+
+def get_or_create_share_token(user_id: int):
+    """Return the user's public share token, creating one if sharing is off.
+    Returns None if the user doesn't exist. Sharing stays off (NULL token)
+    until this is called."""
+    user = get_user_by_id(user_id)
+    if user is None:
+        return None
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT share_token FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    token = row["share_token"] if row else None
+    if not token:
+        token = secrets.token_urlsafe(24)
+        conn.execute(
+            "UPDATE users SET share_token = ? WHERE id = ?", (token, user_id)
+        )
+        conn.commit()
+    conn.close()
+    return token
+
+
+def get_user_by_share_token(token: str):
+    """Return the user (id, email, race_date, share_token, created_at) for a
+    public share token, or None. Never returns the password hash."""
+    if not token:
+        return None
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, email, race_date, share_token, created_at FROM users WHERE share_token = ?",
+        (token,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def disable_sharing(user_id: int):
+    """Turn sharing off: clear the token so the old link stops working.
+    Returns the updated user, or None if the user doesn't exist."""
+    conn = get_connection()
+    conn.execute("UPDATE users SET share_token = NULL WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return get_user_by_id(user_id)
 
 
 def set_race_date(user_id: int, race_date: str):
